@@ -11,6 +11,37 @@
 //   History: 
 //------------------------------------------------
 
+
+
+
+// Boot block structure
+typedef struct {
+    char        DiskType[4]             <comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
+    ulong       Chksum                  <comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
+    ulong       Rootblock               <comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
+    char        Bootblock_code[1012]    <comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
+} BOOTBLOCK <comment="Boot block">;
+
+typedef struct {
+    ulong       type                    <comment="Block type">;
+    ulong       header_key              <comment="Pointer to FileHeader block">;
+    ulong       seq_num                 <comment="file data block number (first is #1)">;
+    ulong       data_size               <comment="data size <= (BSIZE-2">;
+    ulong       next_data               <comment="next data block ptr (0 for last)">;
+    ulong       chksum                  <comment="rootblock algorithm">;
+    char        data[488]               <comment="file data size <= (BSIZE-24)">;
+} DATABLOCK <comment="Data block">; 
+
+
+
+
+// <comment="">;
+
+
+
+
+
+
 BigEndian();
 
 // To save memory, allow a single copy of this template to provide 
@@ -27,14 +58,29 @@ const int SECTORSIZE    = 512;
 
 // Define the file
 local uchar sector[SECTORSIZE];
+local uchar bootblock[SECTORSIZE*2];
 local int64 pos = 0;
-Printf( "Initial pos: %d", pos );
+Printf( "Initial pos: %d\n", pos );
 
 while( !FEof() )
 {
-    
+
     ReadBytes( sector, pos, SECTORSIZE );
-    //Printf( "%o", sector );
+
+
+    if ( sector[0] == 'D' && sector[1] == 'O' && sector[2] == 'S' )
+    {
+        ReadBytes( bootblock, pos, SECTORSIZE * 2 );
+        BOOTBLOCK bootblock;
+    }
+
+    if ( sector[3] == 8 )
+    {
+        DATABLOCK datablock;
+    }
+
+    /*
+    //print sector data
     local int i;
     for (i=0;i<256;i++) 
     {
@@ -46,14 +92,20 @@ while( !FEof() )
     }
     Printf("\n");
     break;    
+    */
 
+
+    /*
+    //print info every 10.000 bytes
     if ( idx  %  10000 == 0 ) 
     {
         Printf( "Pos: %d   Longword: %d\n", idx, longword );
     }
+    */
 
+    //set file cursor to next block
     pos += SECTORSIZE;
-    FSeek(idx);
+    FSeek(pos);
 }
 
 Printf( "Done" );
