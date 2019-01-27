@@ -1,0 +1,86 @@
+//------------------------------------------------
+//--- 010 Editor v9.0.1 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+
+typedef struct {
+    char    un_00001[80]        <comment="">;
+    ulong   farbbomben          <comment="Farbbombe",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00002[8]         <comment="">;
+    ulong   fische              <comment="Fruchtgummifische",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00003[8]         <comment="">;
+    ulong   konfekt             <comment="Kokos-Konfekt",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00004[8]         <comment="">;
+    ulong   lutscher            <comment="Lutscherhammer",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00005[8]         <comment="">;
+    ulong   wert_001            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00006[8]         <comment="">;
+    ulong   wert_002            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00007[8]         <comment="">;
+    ulong   glueck              <comment="Glücksbonbon",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00008[8]         <comment="">;
+    ulong   streifen            <comment="Gestreift & Eingewickelt",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00009[8]         <comment="">;
+    ulong   hand                <comment="Gratis-Wechsel",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00010[8]         <comment="">;
+    ulong   wert_003            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00011[8]         <comment="">;
+    ulong   wert_004            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00012[8]         <comment="">;
+    ulong   wert_005            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00013[8]         <comment="">;
+    ulong   wert_006            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00014[8]         <comment="">;
+    ulong   wert_007            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00015[8]         <comment="">;
+    ulong   wert_008            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00016[8]         <comment="">;
+    ulong   wert_009            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00017[8]         <comment="">;
+    ulong   wert_010            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    char    un_00018[8]         <comment="">;
+    ulong   wert_011            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+} SAVEFILE_CCS  <comment="save file Candy Crush Saga">;
+
+
+
+
+
+//--------------------------------------------
+
+// To save memory, allow a single copy of this template to provide 
+//  syntax highlighting for all open files that match the file mask.
+HighlightAllowInstanceSharing( true );
+
+LittleEndian();
+
+
+Printf( "Start template\n" );
+
+
+//define constants
+const int DATASIZE    = 90396;
+
+//define local vars
+local uchar data[DATASIZE];
+FSeek(0);
+
+while( !FEof() )
+{
+    ReadBytes( data, 0, DATASIZE );
+
+    SAVEFILE_CCS work;
+
+}
+
+
+Printf( "Template done\n" );
