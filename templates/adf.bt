@@ -1,0 +1,59 @@
+//------------------------------------------------
+//--- 010 Editor v9.0.1 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: *.adf
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+BigEndian();
+
+// To save memory, allow a single copy of this template to provide 
+//  syntax highlighting for all open files that match the file mask.
+HighlightAllowInstanceSharing( true );
+
+// Define constants
+const int SECTORSIZE    = 512;
+
+
+
+
+//--------------------------------------------
+
+// Define the file
+local uchar sector[SECTORSIZE];
+local int64 pos = 0;
+Printf( "Initial pos: %d", pos );
+
+while( !FEof() )
+{
+    
+    ReadBytes( sector, pos, SECTORSIZE );
+    //Printf( "%o", sector );
+    local int i;
+    for (i=0;i<256;i++) 
+    {
+        Printf("0x%02x ", sector[i]);
+        if ((i%16==0) && i)
+        {
+            Printf("\n");
+        }
+    }
+    Printf("\n");
+    break;    
+
+    if ( idx  %  10000 == 0 ) 
+    {
+        Printf( "Pos: %d   Longword: %d\n", idx, longword );
+    }
+
+    pos += SECTORSIZE;
+    FSeek(idx);
+}
+
+Printf( "Done" );
