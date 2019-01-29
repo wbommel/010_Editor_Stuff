@@ -36,9 +36,9 @@ typedef struct {
     char    un_00011[8]         <comment="">;
     ulong   ufo                 <comment="Ufo",bgcolor=cRed,fgcolor=cWhite>;
     char    un_00012[8]         <comment="">;
-    ulong   wert_005            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    ulong   pinsel              <comment="Gestreifter Pinsel",bgcolor=cRed,fgcolor=cWhite>;
     char    un_00013[8]         <comment="">;
-    ulong   wert_006            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
+    ulong   party               <comment="Partybooster",bgcolor=cRed,fgcolor=cWhite>;
     char    un_00014[8]         <comment="">;
     ulong   wert_007            <comment="unbekannter Wert",bgcolor=cRed,fgcolor=cWhite>;
     char    un_00015[8]         <comment="">;
