@@ -65,20 +65,27 @@ LittleEndian();
 
 
 Printf( "Start template\n" );
-
+Printf( "Struct size: %d\n", sizeof( SAVEFILE_CCS ) );
 
 //define constants
-const int DATASIZE    = 90376;
+const int DATASIZE    = sizeof( SAVEFILE_CCS );
 
 //define local vars
 local uchar data[DATASIZE];
+local int pos = 0;
 
 while( !FEof() )
 {
-    ReadBytes( data, 0, DATASIZE );
-
-    SAVEFILE_CCS work;
-
+    if ( pos == 0 )
+    {
+        ReadBytes( data, pos, DATASIZE );
+        SAVEFILE_CCS work;
+        
+        pos *= DATASIZE - 1;
+    }
+    
+    pos++;
+    FSeek( pos );
 }
 
 
