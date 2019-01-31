@@ -13,24 +13,62 @@
 
 
 
+// Define constants
+const int BSIZE		= 512;				// sizeof a disc sector in bytes
+const int HT_SIZE	= BSIZE / 4 - 56;	//
+
+
 
 // Boot block structure
 typedef struct {
-    char        DiskType[4]             <comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
-    ulong       Chksum                  <comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
-    ulong       Rootblock               <comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
-    char        Bootblock_code[1012]    <comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
+	char		DiskType[4]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
+	ulong		Chksum					<comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
+	ulong		Rootblock				<comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
+	char		Bootblock_code[1012]	<comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
 } BOOTBLOCK <comment="Boot block">;
 
+// Root block structure
 typedef struct {
-    ulong       type                    <comment="Block type">;
-    ulong       header_key              <comment="Pointer to FileHeader block">;
-    ulong       seq_num                 <comment="file data block number (first is #1)">;
-    ulong       data_size               <comment="data size <= (BSIZE-2">;
-    ulong       next_data               <comment="next data block ptr (0 for last)">;
-    ulong       chksum                  <comment="rootblock algorithm">;
-    char        data[488]               <comment="file data size <= (BSIZE-24)">;
-} DATABLOCK <comment="Data block">; 
+	ulong		type					<comment="block primary type = T_HEADER (value 2)">;
+	ulong		header_key				<comment="unused in rootblock (value 0)">;
+	ulong		high_seq				<comment="unused (value 0)">;
+	ulong		ht_size					<comment="Hash table size in long (= BSIZE/4 - 56). For floppy disk value 0x48">;
+	ulong		first_data				<comment="unused (value 0)">;
+	ulong		chksum					<comment="Rootblock checksum">;
+	ulong		ht[HT_SIZE]				<comment="hash table (entry block number) (= (BSIZE/4) - 56) for floppy disk: size= 72 longwords">;
+	ulong		bm_flag					<comment="bitmap flag, -1 means VALID">;
+	ulong		bm_pages[25]			<comment="bitmap blocks pointers (first one at bm_pages[0])">;
+	ulong		bm_ext					<comment="first bitmap extension block (Hard disks only)">;
+	ulong		r_days					<comment="last root alteration date (days since 1 jan 78)">;
+	ulong		r_mins					<comment="minutes past midnight">;
+	ulong		r_ticks					<comment="ticks (1/50 sec) past last minute">;
+	ulong		name_len				<comment="volume name length">;
+	char		diskname[30]			<comment="volume name">;
+	char		UNUSED					<comment="set to 0">;
+	ulong		UNUSED					<comment="set to 0">;
+	ulong		UNUSED					<comment="set to 0">;
+	ulong		v_days					<comment="last disk alteration date (days since 1 jan 78)">;
+	ulong		v_mins					<comment="minutes past midnight">;
+	ulong		v_ticks					<comment="ticks (1/50 sec) past last minute">;
+	ulong		c_days					<comment="filesystem creation date (days since 1 jan 78)">;
+	ulong		c_mins					<comment="minutes past midnight">;
+	ulong		c_ticks					<comment="ticks (1/50 sec) past last minute">;
+	ulong		next_hash				<comment="unused (value = 0)">;
+	ulong		parent_dir				<comment="unused (value = 0)">;
+	ulong		extension				<comment="FFS: first directory cache block, 0 otherwise">;
+	ulong		sec_type				<comment="block secondary type = ST_ROOT (value 1)">;
+} ROOTBLOCK <comment="Root block">;
+
+// OFS data block structure
+typedef struct {
+	ulong		type					<comment="Block type">;
+	ulong		header_key				<comment="Pointer to FileHeader block">;
+	ulong		seq_num					<comment="file data block number (first is #1)">;
+	ulong		data_size				<comment="data size <= (BSIZE-2">;
+	ulong		next_data				<comment="next data block ptr (0 for last)">;
+	ulong		chksum					<comment="rootblock algorithm">;
+	char		data[488]				<comment="file data size <= (BSIZE-24)">;
+} DATABLOCK <comment="Data block (OFS)">; 
 
 
 
@@ -41,71 +79,66 @@ typedef struct {
 
 
 
-
+//--------------------------------------------
+// Values in 68xxx CPU's are BigEndian
 BigEndian();
 
 // To save memory, allow a single copy of this template to provide 
 //  syntax highlighting for all open files that match the file mask.
 HighlightAllowInstanceSharing( true );
 
-// Define constants
-const int SECTORSIZE    = 512;
-
-
-
-
-//--------------------------------------------
-
-// Define the file
-local uchar sector[SECTORSIZE];
-local uchar bootblock[SECTORSIZE*2];
+// Define the locals
+local uchar sector[BSIZE];
+local uchar bootblock[BSIZE * 2];
 local int64 pos = 0;
-Printf( "Initial pos: %d\n", pos );
-
-while( !FEof() )
-{
-
-    ReadBytes( sector, pos, SECTORSIZE );
 
 
-    if ( sector[0] == 'D' && sector[1] == 'O' && sector[2] == 'S' )
-    {
-        ReadBytes( bootblock, pos, SECTORSIZE * 2 );
-        BOOTBLOCK bootblock;
-    }
 
-    if ( sector[3] == 8 )
-    {
-        DATABLOCK datablock;
-    }
-
-    /*
-    //print sector data
-    local int i;
-    for (i=0;i<256;i++) 
-    {
-        Printf("0x%02x ", sector[i]);
-        if ((i%16==0) && i)
-        {
-            Printf("\n");
-        }
-    }
-    Printf("\n");
-    break;    
-    */
-
-
-    /*
-    //print info every 10.000 bytes
-    if ( idx  %  10000 == 0 ) 
-    {
-        Printf( "Pos: %d   Longword: %d\n", idx, longword );
-    }
-    */
-
-    //set file cursor to next block
-    pos += SECTORSIZE;
-    FSeek(pos);
+/*
+ * function declarations
+ */
+// Loop through disc sectors sequentially
+void _sequentialAproach() {
+	while( !FEof() )
+	{
+	
+		ReadBytes( sector, pos, BSIZE );
+	
+		//detect boot block
+		if ( sector[0] == 'D' && sector[1] == 'O' && sector[2] == 'S' ) {
+			ReadBytes( bootblock, pos, BSIZE * 2 );
+			BOOTBLOCK typebootblock;
+		}
+	
+		if ( sector[3] == 8 )
+		{
+			DATABLOCK typedatablock;
+		}
+	
+		//set file cursor to next block
+		pos += BSIZE;
+		FSeek(pos);
+	}
 }
 
-Printf( "Done" );
+// Filesystem tree aproach
+void _filesystemTreeAproach() {
+	//read boot block
+	ReadBytes( bootblock, 0, BSIZE * 2 );
+	BOOTBLOCK typebootblock;
+
+	// get root pointer of boot block
+
+	
+}
+
+
+/*
+ * template action
+ */
+Printf( "Start template\n" );
+
+//_sequentialAproach();
+_filesystemTreeAproach();
+
+Printf( "Template done\n" );
