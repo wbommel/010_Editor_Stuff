@@ -59,6 +59,39 @@ typedef struct {
 	ulong		sec_type				<comment="block secondary type = ST_ROOT (value 1)">;
 } ROOTBLOCK <bgcolor=cGray,comment="Root block">;
 
+// File header block structure
+typedef struct {
+	ulong		type					<comment="block primary type T_HEADER (==2)">;
+	ulong		header_key				<comment="self pointer (to this block)">;
+	ulong		high_seq				<comment="number of data block ptr stored here">;
+	ulong		data_size				<comment="unused (==0)">;
+	ulong		first_data				<comment="first data block ptr">;
+	ulong		chksum					<format=hex,comment="same algorithm as rootblock">;
+	ulong		data_blocks[(BSIZE/4) - 56]	<comment="data blk ptr (first at BSIZE-204) = (BSIZE/4) - 56">;
+	ulong		UNUSED					<comment="unused (==0)">;
+	ushort		UID						<comment="UserID">;
+	ushort		GID						<comment="GroupID">;
+	ulong		protect					<comment="protection flags (set to 0 by default)">;
+	ulong		byte_size				<comment="file size in bytes">;
+	uchar		comm_len				<comment="file comment length">;
+	uchar		comment[79]				<comment="comment (max. 79 chars permitted)">;
+	uchar		UNUSED[12]				<comment="set to 0">;
+	ulong		days					<comment="last change date (days since 1 jan 78)">;
+	ulong		mins					<comment="last change time">;
+	ulong		ticks					<comment="in 1/50s of a seconds">;
+	uchar		name_len				<comment="filename length">;
+	uchar		filename[30]			<comment="filename (max. 30 chars permitted)">;
+	uchar		UNUSED					<comment="set to 0">;
+	ulong		UNUSED					<comment="set to 0">;
+	ulong		real_entry				<comment="FFS : unused (== 0)">;
+	ulong		next_link				<comment="FFS : hardlinks chained list (first=newest)">;
+	ulong		UNUSED[5]				<comment="set to 0">;
+	ulong		hash_chain				<comment="next entry ptr with same hash">;
+	ulong		parent					<comment="parent directory">;
+	ulong		extension				<comment="pointer to 1st file extension block">;
+	ulong		sec_type				<comment="secondary type : ST_FILE (== -3)">;
+} FILEHEADERBLOCK <bgcolor=cGray,comment="File header block">;
+
 // OFS data block structure
 typedef struct {
 	ulong		type					<comment="Block type">;
