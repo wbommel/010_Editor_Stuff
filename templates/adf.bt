@@ -12,7 +12,6 @@
 //------------------------------------------------
 
 
-
 // Define constants
 const int BSIZE		= 512;				// sizeof a disc sector in bytes
 const int HT_SIZE	= BSIZE / 4 - 56;	//
@@ -21,7 +20,8 @@ const int HT_SIZE	= BSIZE / 4 - 56;	//
 
 // Boot block structure
 typedef struct {
-	uchar		DiskType[4]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
+	uchar		DiskType[3]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
+	uchar		flags					<format=binary,comment=_getDiscFlagsString>;
 	ulong		chksum					<format=hex,comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
 	ulong		Rootblock				<comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
 	uchar		Bootblock_code[1012]	<comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
@@ -156,6 +156,31 @@ void _filesystemTreeAproach() {
 ulong _getULongByPos_BigEndian( int pos ) {
 	ReadBytes( ulongValue, pos, 4 );
 	return (ulongValue[0] * Pow( 2, 32 )) + (ulongValue[1] * Pow( 2, 16 )) + (ulongValue[2] * Pow( 2, 8 )) + (ulongValue[3]);
+}
+
+// get disc type flags string
+string _getDiscFlagsString( byte flags ) {
+	string strFlags = "";
+
+	if( ((flags) & (1<<(0))) ) {
+		strFlags += "| FFS ";
+	} else {
+		strFlags += "| OFS ";
+	}
+
+	if( ((flags) & (1<<(1))) ) {
+		strFlags += "| INTL ONLY ";
+	} else {
+		strFlags += "| NO_INTL ONLY ";
+	}
+
+	if( ((flags) & (1<<(2))) ) {
+		strFlags += "| DIRC&INTL ";
+	} else {
+		strFlags += "| NO_DIRC&INTL ";
+	}
+
+	return strFlags;
 }
 
 
