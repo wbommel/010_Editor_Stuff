@@ -22,10 +22,10 @@ const int HT_SIZE	= BSIZE / 4 - 56;	//
 // Boot block structure
 typedef struct {
 	uchar		DiskType[4]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
-	ulong		Chksum					<comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
+	ulong		chksum					<format=hex,comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
 	ulong		Rootblock				<comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
 	uchar		Bootblock_code[1012]	<comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
-} BOOTBLOCK <comment="Boot block">;
+} BOOTBLOCK <bgcolor=cGray,comment="Boot block">;
 
 // Root block structure
 typedef struct {
@@ -34,7 +34,7 @@ typedef struct {
 	ulong		high_seq				<comment="unused (value 0)">;
 	ulong		ht_size					<comment="Hash table size in long (= BSIZE/4 - 56). For floppy disk value 0x48">;
 	ulong		first_data				<comment="unused (value 0)">;
-	ulong		chksum					<comment="Rootblock checksum">;
+	ulong		chksum					<format=hex,comment="Rootblock checksum">;
 	ulong		ht[HT_SIZE]				<comment="hash table (entry block number) (= (BSIZE/4) - 56) for floppy disk: size= 72 longwords">;
 	ulong		bm_flag					<comment="bitmap flag, -1 means VALID">;
 	ulong		bm_pages[25]			<comment="bitmap blocks pointers (first one at bm_pages[0])">;
@@ -42,7 +42,7 @@ typedef struct {
 	ulong		r_days					<comment="last root alteration date (days since 1 jan 78)">;
 	ulong		r_mins					<comment="minutes past midnight">;
 	ulong		r_ticks					<comment="ticks (1/50 sec) past last minute">;
-	ulong		name_len				<comment="volume name length">;
+	uchar		name_len				<comment="volume name length">;
 	uchar		diskname[30]			<comment="volume name">;
 	uchar		UNUSED					<comment="set to 0">;
 	ulong		UNUSED					<comment="set to 0">;
@@ -57,7 +57,7 @@ typedef struct {
 	ulong		parent_dir				<comment="unused (value = 0)">;
 	ulong		extension				<comment="FFS: first directory cache block, 0 otherwise">;
 	ulong		sec_type				<comment="block secondary type = ST_ROOT (value 1)">;
-} ROOTBLOCK <comment="Root block">;
+} ROOTBLOCK <bgcolor=cGray,comment="Root block">;
 
 // OFS data block structure
 typedef struct {
@@ -66,7 +66,7 @@ typedef struct {
 	ulong		seq_num					<comment="file data block number (first is #1)">;
 	ulong		data_size				<comment="data size <= (BSIZE-2">;
 	ulong		next_data				<comment="next data block ptr (0 for last)">;
-	ulong		chksum					<comment="rootblock algorithm">;
+	ulong		chksum					<format=hex,comment="rootblock algorithm">;
 	uchar		data[488]				<comment="file data size <= (BSIZE-24)">;
 } DATABLOCK <comment="Data block (OFS)">; 
 
@@ -119,7 +119,7 @@ void _sequentialAproach() {
 	
 		//set file cursor to next block
 		pos += BSIZE;
-		FSeek(pos);
+		FSeek( pos );
 	}
 }
 
@@ -134,7 +134,9 @@ void _filesystemTreeAproach() {
 	if ( typebootblock.Rootblock > 0 && typebootblock.Rootblock < 1760 ) { //1760 is maximum size of DD discs. HD is twice as much.
 		rootPointer = typebootblock.Rootblock;
 	}
-	ReadBytes( sector, rootPointer, BSIZE );
+	
+	FSeek( rootPointer * BSIZE );
+	ReadBytes( sector, rootPointer * BSIZE, BSIZE );
 	ROOTBLOCK typerootblock;
 	if ( typerootblock.type != 2 || typerootblock.sec_type != 1 ) {
 		//typerootblock = 0;
