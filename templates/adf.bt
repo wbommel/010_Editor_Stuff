@@ -1,9 +1,9 @@
 //------------------------------------------------
 //--- 010 Editor v9.0.1 Binary Template
 //
-//      File: 
-//   Authors: 
-//   Version: 
+//      File: adf.bt
+//   Authors: Volker Broemmel
+//   Version: 0.0.1
 //   Purpose: 
 //  Category: 
 // File Mask: *.adf
@@ -21,10 +21,10 @@ const int HT_SIZE	= BSIZE / 4 - 56;	//
 
 // Boot block structure
 typedef struct {
-	char		DiskType[4]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
+	uchar		DiskType[4]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
 	ulong		Chksum					<comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
 	ulong		Rootblock				<comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
-	char		Bootblock_code[1012]	<comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
+	uchar		Bootblock_code[1012]	<comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
 } BOOTBLOCK <comment="Boot block">;
 
 // Root block structure
@@ -43,8 +43,8 @@ typedef struct {
 	ulong		r_mins					<comment="minutes past midnight">;
 	ulong		r_ticks					<comment="ticks (1/50 sec) past last minute">;
 	ulong		name_len				<comment="volume name length">;
-	char		diskname[30]			<comment="volume name">;
-	char		UNUSED					<comment="set to 0">;
+	uchar		diskname[30]			<comment="volume name">;
+	uchar		UNUSED					<comment="set to 0">;
 	ulong		UNUSED					<comment="set to 0">;
 	ulong		UNUSED					<comment="set to 0">;
 	ulong		v_days					<comment="last disk alteration date (days since 1 jan 78)">;
@@ -67,7 +67,7 @@ typedef struct {
 	ulong		data_size				<comment="data size <= (BSIZE-2">;
 	ulong		next_data				<comment="next data block ptr (0 for last)">;
 	ulong		chksum					<comment="rootblock algorithm">;
-	char		data[488]				<comment="file data size <= (BSIZE-24)">;
+	uchar		data[488]				<comment="file data size <= (BSIZE-24)">;
 } DATABLOCK <comment="Data block (OFS)">; 
 
 
@@ -91,6 +91,8 @@ HighlightAllowInstanceSharing( true );
 local uchar sector[BSIZE];
 local uchar bootblock[BSIZE * 2];
 local int64 pos = 0;
+
+local uchar ulongValue[4];
 
 
 
@@ -127,10 +129,33 @@ void _filesystemTreeAproach() {
 	ReadBytes( bootblock, 0, BSIZE * 2 );
 	BOOTBLOCK typebootblock;
 
-	// get root pointer of boot block
+	//read root block
+	local int rootPointer = 880; //standard value for root block is 880
+	if ( typebootblock.Rootblock > 0 && typebootblock.Rootblock < 1760 ) { //1760 is maximum size of DD discs. HD is twice as much.
+		rootPointer = typebootblock.Rootblock;
+	}
+	ReadBytes( sector, rootPointer, BSIZE );
+	ROOTBLOCK typerootblock;
+	if ( typerootblock.type != 2 || typerootblock.sec_type != 1 ) {
+		//typerootblock = 0;
+	}
 
-	
+
+	Printf( "Boot block root pointer 1: %d\n", _getULongByPos_BigEndian( 8 ) );
+	Printf( "Boot block root pointer 2: %d\n", typebootblock.Rootblock );
 }
+
+
+
+/*
+ * helpers
+ */
+// get ulong values
+ulong _getULongByPos_BigEndian( int pos ) {
+	ReadBytes( ulongValue, pos, 4 );
+	return (ulongValue[0] * Pow( 2, 32 )) + (ulongValue[1] * Pow( 2, 16 )) + (ulongValue[2] * Pow( 2, 8 )) + (ulongValue[3]);
+}
+
 
 
 /*
