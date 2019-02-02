@@ -16,6 +16,17 @@
 const int BSIZE		= 512;				// sizeof a disc sector in bytes
 const int HT_SIZE	= BSIZE / 4 - 56;	//
 
+//define enums
+enum BLOCKTYPE {
+	UNKNOWN = -1,
+	BootBlock = 100,
+	RootBlock,
+	BitmapBlock,
+	FileHeaderBlock,
+	FileExtensionBlock,
+	DataBlock,
+	UserDirectoryBlock,
+};
 
 
 // Boot block structure
@@ -121,7 +132,7 @@ BigEndian();
 HighlightAllowInstanceSharing( true );
 
 // Define the locals
-local uchar sector[BSIZE];
+local uchar blockArray[BSIZE];
 local uchar bootblock[BSIZE * 2];
 local int64 pos = 0;
 
@@ -137,19 +148,23 @@ void _sequentialAproach() {
 	while( !FEof() )
 	{
 	
-		ReadBytes( sector, pos, BSIZE );
+		ReadBytes( blockArray, pos, BSIZE );
 	
 		//detect boot block
-		if ( sector[0] == 'D' && sector[1] == 'O' && sector[2] == 'S' ) {
+		if ( blockArray[0] == 'D' && blockArray[1] == 'O' && blockArray[2] == 'S' ) {
 			ReadBytes( bootblock, pos, BSIZE * 2 );
 			BOOTBLOCK typebootblock;
 		}
 	
-		if ( sector[3] == 8 )
+		//detect OFS data block
+		if ( blockArray[3] == 8 )
 		{
 			DATABLOCK typedatablock;
 		}
-	
+		
+		//detect file header blocks
+		
+		
 		//set file cursor to next block
 		pos += BSIZE;
 		FSeek( pos );
@@ -169,7 +184,7 @@ void _filesystemTreeAproach() {
 	}
 	
 	FSeek( rootPointer * BSIZE );
-	ReadBytes( sector, rootPointer * BSIZE, BSIZE );
+	ReadBytes( blockArray, rootPointer * BSIZE, BSIZE );
 	ROOTBLOCK typerootblock;
 	if ( typerootblock.type != 2 || typerootblock.sec_type != 1 ) {
 		//typerootblock = 0;
@@ -185,10 +200,51 @@ void _filesystemTreeAproach() {
 /*
  * helpers
  */
-// get ulong values
+// get ulong by pos
 ulong _getULongByPos_BigEndian( int pos ) {
 	ReadBytes( ulongValue, pos, 4 );
-	return (ulongValue[0] * Pow( 2, 32 )) + (ulongValue[1] * Pow( 2, 16 )) + (ulongValue[2] * Pow( 2, 8 )) + (ulongValue[3]);
+	return _getULong_BigEndian( ulongValue );
+}
+
+// get ulong by uchar array
+ulong _getULong_BigEndian( uchar ul[] ) {
+	return (ul[0] * Pow( 2, 32 )) + (ul[1] * Pow( 2, 16 )) + (ul[2] * Pow( 2, 8 )) + (ul[3]);
+}
+
+// get long by pos
+int32 _getInt32ByPos_BigEndian( int pos ) {
+	local uchar charArray[4];
+	ReadBytes( charArray, pos, 4 );
+	return _getInt32_BigEndian( charArray );
+}
+
+// get long by uchar array
+int32 _getInt32_BigEndian( uchar ul[] ) {
+	return (ul[0] * Pow( 2, 32 )) + (ul[1] * Pow( 2, 16 )) + (ul[2] * Pow( 2, 8 )) + (ul[3]);
+}
+
+// get block type
+BLOCKTYPE _getBlockType( int blockNumber ){
+	//prepare var
+	local BLOCKTYPE bt = UNKNOWN;
+
+	//detect boot block
+	ReadBytes( blockArray, blockNumber * BSIZE, BSIZE );
+	if ( blockArray[0] == 'D' && blockArray[1] == 'O' && blockArray[2] == 'S' ) {
+		return bt = BootBlock;
+	}
+
+	//get type ulongs of block
+	local int32 type = _getInt32ByPos_BigEndian( blockNumber * BSIZE );
+	local int32 sec_type = _getInt32ByPos_BigEndian( (blockNumber * BSIZE) + 508 );
+	Printf( "	type: %d - sec-type: %d\n", type, sec_type );
+	if ( type == 2 && sec_type == 1 ) { return bt = RootBlock; }			//detect root block
+	if ( type == 2 && sec_type == -3 ) { return bt = FileHeaderBlock; }		//detect file header
+	if ( type == 16 && sec_type == -3 ) { return bt = FileExtensionBlock; }	//detect file extension block
+	if ( type == 8 ) { return bt = DataBlock; }								//detect data block
+	if ( type == 2 && sec_type == 2 ) { return bt = UserDirectoryBlock; }	//detect user directory block
+
+	return bt;
 }
 
 // get disc type flags string
@@ -223,7 +279,42 @@ string _getDiscFlagsString( byte flags ) {
  */
 Printf( "Start template\n" );
 
+Printf( "ulong value of block 880 byte 0-3: %d\n\n", _getULongByPos_BigEndian(880*BSIZE));
+
+local int blockNr = 0;
+local BLOCKTYPE bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 880; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 3; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 952; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 893; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
 //_sequentialAproach();
 _filesystemTreeAproach();
 
-Printf( "Template done\n" );
+Printf( "Template done\n\n\n" );
+
+
+
+local int num = 2130706432;
+local int x;
+local ulong a[4];
+
+a[0] = (num>>24) & 0xFF;
+a[1] = (num>>16) & 0xFF;
+a[2] = (num>>8) & 0xFF;
+a[3] = num & 0xFF;
+
+x = (a[0] << 24) | 
+	(a[1] << 16) | 
+	(a[2] << 8) | 
+	a[3];
+Printf("%d\n", x);
