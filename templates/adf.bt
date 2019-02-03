@@ -171,6 +171,20 @@ void _sequentialAproach() {
 	}
 }
 
+// Loop through disc sectors sequentially
+void _sequentialAproach2() {
+	pos = 0;
+
+	while( !FEof() )
+	{
+		_getBlockType2( pos );
+		
+		//set file cursor to next block
+		pos += BSIZE;
+		//FSeek( pos );
+	}
+}
+
 // Filesystem tree aproach
 void _filesystemTreeAproach() {
 	//read boot block
@@ -214,7 +228,9 @@ BLOCKTYPE _getBlockType( int blockNumber ){
 	//get type ulongs of block
 	local int type = ReadInt( blockNumber * BSIZE );
 	local int sec_type = ReadInt( (blockNumber * BSIZE) + 508 );
-	Printf( "	type: %d - sec-type: %d\n", type, sec_type );
+	//Printf( "	type: %d - sec-type: %d\n", type, sec_type );
+	
+	//detect different block types
 	if ( type == 2 && sec_type == 1 ) { return bt = RootBlock; }			//detect root block
 	if ( type == 2 && sec_type == -3 ) { return bt = FileHeaderBlock; }		//detect file header
 	if ( type == 16 && sec_type == -3 ) { return bt = FileExtensionBlock; }	//detect file extension block
@@ -249,6 +265,32 @@ string _getDiscFlagsString( byte flags ) {
 	return strFlags;
 }
 
+// get block type
+BLOCKTYPE _getBlockType2( int blockNumber ){
+	//prepare var
+	local BLOCKTYPE bt = UNKNOWN;
+
+	//detect boot block
+	ReadBytes( blockArray, blockNumber * BSIZE, BSIZE );
+	if ( blockArray[0] == 'D' && blockArray[1] == 'O' && blockArray[2] == 'S' ) {
+		return bt = BootBlock; BOOTBLOCK typebootblock;
+	}
+
+	//get type ulongs of block
+	local int type = ReadInt( blockNumber * BSIZE );
+	local int sec_type = ReadInt( (blockNumber * BSIZE) + 508 );
+	//Printf( "	type: %d - sec-type: %d\n", type, sec_type );
+	
+	//detect different block types
+	if ( type == 2 && sec_type == 1 ) { return bt = RootBlock; ROOTBLOCK typerootblock; }			//detect root block
+	if ( type == 2 && sec_type == -3 ) { return bt = FileHeaderBlock; FILEHEADERBLOCK typefileheaderblock; }		//detect file header
+	if ( type == 16 && sec_type == -3 ) { return bt = FileExtensionBlock; }	//detect file extension block
+	if ( type == 8 ) { return bt = DataBlock; DATABLOCK typedatablock; }								//detect data block
+	if ( type == 2 && sec_type == 2 ) { return bt = UserDirectoryBlock; }	//detect user directory block
+
+	return bt;
+}
+
 
 
 /*
@@ -274,7 +316,7 @@ Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
 blockNr = 893; bt2 = _getBlockType( blockNr );
 Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
 
-//_sequentialAproach();
-_filesystemTreeAproach();
+_sequentialAproach();
+//_filesystemTreeAproach();
 
 Printf( "Template done\n\n\n" );
