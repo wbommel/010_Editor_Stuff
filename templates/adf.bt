@@ -191,7 +191,7 @@ void _filesystemTreeAproach() {
 	}
 
 
-	Printf( "Boot block root pointer 1: %d\n", _getULongByPos_BigEndian( 8 ) );
+	Printf( "Boot block root pointer 1: %d\n", ReadInt( 8 ) );
 	Printf( "Boot block root pointer 2: %d\n", typebootblock.Rootblock );
 }
 
@@ -200,29 +200,6 @@ void _filesystemTreeAproach() {
 /*
  * helpers
  */
-// get ulong by pos
-ulong _getULongByPos_BigEndian( int pos ) {
-	ReadBytes( ulongValue, pos, 4 );
-	return _getULong_BigEndian( ulongValue );
-}
-
-// get ulong by uchar array
-ulong _getULong_BigEndian( uchar ul[] ) {
-	return (ul[0] * Pow( 2, 32 )) + (ul[1] * Pow( 2, 16 )) + (ul[2] * Pow( 2, 8 )) + (ul[3]);
-}
-
-// get long by pos
-int32 _getInt32ByPos_BigEndian( int pos ) {
-	local uchar charArray[4];
-	ReadBytes( charArray, pos, 4 );
-	return _getInt32_BigEndian( charArray );
-}
-
-// get long by uchar array
-int32 _getInt32_BigEndian( uchar ul[] ) {
-	return (ul[0] * Pow( 2, 32 )) + (ul[1] * Pow( 2, 16 )) + (ul[2] * Pow( 2, 8 )) + (ul[3]);
-}
-
 // get block type
 BLOCKTYPE _getBlockType( int blockNumber ){
 	//prepare var
@@ -235,8 +212,8 @@ BLOCKTYPE _getBlockType( int blockNumber ){
 	}
 
 	//get type ulongs of block
-	local int32 type = _getInt32ByPos_BigEndian( blockNumber * BSIZE );
-	local int32 sec_type = _getInt32ByPos_BigEndian( (blockNumber * BSIZE) + 508 );
+	local int type = ReadInt( blockNumber * BSIZE );
+	local int sec_type = ReadInt( (blockNumber * BSIZE) + 508 );
 	Printf( "	type: %d - sec-type: %d\n", type, sec_type );
 	if ( type == 2 && sec_type == 1 ) { return bt = RootBlock; }			//detect root block
 	if ( type == 2 && sec_type == -3 ) { return bt = FileHeaderBlock; }		//detect file header
@@ -279,7 +256,7 @@ string _getDiscFlagsString( byte flags ) {
  */
 Printf( "Start template\n" );
 
-Printf( "ulong value of block 880 byte 0-3: %d\n\n", _getULongByPos_BigEndian(880*BSIZE));
+Printf( "ulong value of block 880 byte 0-3: %d\n\n", ReadInt( 880*BSIZE ) );
 
 local int blockNr = 0;
 local BLOCKTYPE bt2 = _getBlockType( blockNr );
@@ -301,20 +278,3 @@ Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
 _filesystemTreeAproach();
 
 Printf( "Template done\n\n\n" );
-
-
-
-local int num = 2130706432;
-local int x;
-local ulong a[4];
-
-a[0] = (num>>24) & 0xFF;
-a[1] = (num>>16) & 0xFF;
-a[2] = (num>>8) & 0xFF;
-a[3] = num & 0xFF;
-
-x = (a[0] << 24) | 
-	(a[1] << 16) | 
-	(a[2] << 8) | 
-	a[3];
-Printf("%d\n", x);
