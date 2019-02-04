@@ -12,20 +12,31 @@
 //------------------------------------------------
 
 
-
 // Define constants
 const int BSIZE		= 512;				// sizeof a disc sector in bytes
 const int HT_SIZE	= BSIZE / 4 - 56;	//
 
+//define enums
+enum BLOCKTYPE {
+	UNKNOWN = -1,
+	BootBlock = 100,
+	RootBlock,
+	BitmapBlock,
+	FileHeaderBlock,
+	FileExtensionBlock,
+	DataBlock,
+	UserDirectoryBlock,
+};
 
 
 // Boot block structure
 typedef struct {
-	uchar		DiskType[4]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
-	ulong		Chksum					<comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
+	uchar		DiskType[3]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
+	uchar		flags					<format=binary,comment=_getDiscFlagsString>;
+	ulong		chksum					<format=hex,comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
 	ulong		Rootblock				<comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
 	uchar		Bootblock_code[1012]	<comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
-} BOOTBLOCK <comment="Boot block">;
+} BOOTBLOCK <bgcolor=cGray,comment="Boot block">;
 
 // Root block structure
 typedef struct {
@@ -34,7 +45,7 @@ typedef struct {
 	ulong		high_seq				<comment="unused (value 0)">;
 	ulong		ht_size					<comment="Hash table size in long (= BSIZE/4 - 56). For floppy disk value 0x48">;
 	ulong		first_data				<comment="unused (value 0)">;
-	ulong		chksum					<comment="Rootblock checksum">;
+	ulong		chksum					<format=hex,comment="Rootblock checksum">;
 	ulong		ht[HT_SIZE]				<comment="hash table (entry block number) (= (BSIZE/4) - 56) for floppy disk: size= 72 longwords">;
 	ulong		bm_flag					<comment="bitmap flag, -1 means VALID">;
 	ulong		bm_pages[25]			<comment="bitmap blocks pointers (first one at bm_pages[0])">;
@@ -42,8 +53,8 @@ typedef struct {
 	ulong		r_days					<comment="last root alteration date (days since 1 jan 78)">;
 	ulong		r_mins					<comment="minutes past midnight">;
 	ulong		r_ticks					<comment="ticks (1/50 sec) past last minute">;
-	ulong		name_len				<comment="volume name length">;
-	uchar		diskname[30]			<comment="volume name">;
+	uchar		name_len				<comment="volume name length">;
+	char		diskname[30]			<comment="volume name">;
 	uchar		UNUSED					<comment="set to 0">;
 	ulong		UNUSED					<comment="set to 0">;
 	ulong		UNUSED					<comment="set to 0">;
@@ -57,7 +68,62 @@ typedef struct {
 	ulong		parent_dir				<comment="unused (value = 0)">;
 	ulong		extension				<comment="FFS: first directory cache block, 0 otherwise">;
 	ulong		sec_type				<comment="block secondary type = ST_ROOT (value 1)">;
-} ROOTBLOCK <comment="Root block">;
+} ROOTBLOCK <bgcolor=cGray,comment="Root block">;
+
+// Bitmap block structure
+typedef struct {
+	ulong		chksum					<format=hex,comment="normal algorithm">;
+	ulong		map[(BSIZE/4) - 1]		<comment="map">;
+} BITMAPBLOCK <bgcolor=cGray,comment="Root block">;
+
+// File header block structure
+typedef struct {
+	ulong		type					<comment="block primary type T_HEADER (==2)">;
+	ulong		header_key				<comment="self pointer (to this block)">;
+	ulong		high_seq				<comment="number of data block ptr stored here">;
+	ulong		data_size				<comment="unused (==0)">;
+	ulong		first_data				<comment="first data block ptr">;
+	ulong		chksum					<format=hex,comment="same algorithm as rootblock">;
+	ulong		data_blocks[(BSIZE/4) - 56]	<comment="data blk ptr (first at BSIZE-204) = (BSIZE/4) - 56">;
+	ulong		UNUSED0					<comment="unused (==0)">;
+	ushort		UID						<comment="UserID">;
+	ushort		GID						<comment="GroupID">;
+	ulong		protect					<comment="protection flags (set to 0 by default)">;
+	ulong		byte_size				<comment="file size in bytes">;
+	uchar		comm_len				<comment="file comment length">;
+	uchar		comment[79]				<comment="comment (max. 79 chars permitted)">;
+	uchar		UNUSED1[12]				<comment="set to 0">;
+	ulong		days					<comment="last change date (days since 1 jan 78)">;
+	ulong		mins					<comment="last change time">;
+	ulong		ticks					<comment="in 1/50s of a seconds">;
+	uchar		name_len				<comment="filename length">;
+	char		filename[30]			<comment="filename (max. 30 chars permitted)">;
+	uchar		UNUSED					<comment="set to 0">;
+	ulong		UNUSED					<comment="set to 0">;
+	ulong		real_entry				<comment="FFS : unused (== 0)">;
+	ulong		next_link				<comment="FFS : hardlinks chained list (first=newest)">;
+	ulong		UNUSED3[5]				<comment="set to 0">;
+	ulong		hash_chain				<comment="next entry ptr with same hash">;
+	ulong		parent					<comment="parent directory">;
+	ulong		extension				<comment="pointer to 1st file extension block">;
+	ulong		sec_type				<comment="secondary type : ST_FILE (== -3)">;
+} FILEHEADERBLOCK <bgcolor=cGray,comment="File header block">;
+
+// File extension block structure (sometimes also called "file list block")
+typedef struct {
+	ulong		type					<comment="primary type : T_LIST (== 16)">;
+	ulong		header_key				<comment="self pointer">;
+	ulong		high_seq				<comment="number of data blk ptr stored">;
+	ulong		UNUSED0					<comment="unused (==0)">;
+	ulong		UNUSED1					<comment="unused (==0)">;
+	ulong		chksum					<format=hex,comment="rootblock algorithm">;
+	ulong		data_blocks[(BSIZE/4) - 56]	<comment="data blk ptr (first at BSIZE-204) = (BSIZE/4) - 56">;
+	ulong		info[46]				<comment="unused (==0)">;
+	ulong		UNUSED2					<comment="unused (==0)">;
+	ulong		parent					<comment="file header block">;
+	ulong		extension				<comment="next file extension block, 0 for last">;
+	ulong		sec_type				<comment="secondary type : ST_FILE (== -3)">;
+} FILEEXTENSIONBLOCK <bgcolor=cGray,comment="File extension block">;
 
 // OFS data block structure
 typedef struct {
@@ -66,7 +132,7 @@ typedef struct {
 	ulong		seq_num					<comment="file data block number (first is #1)">;
 	ulong		data_size				<comment="data size <= (BSIZE-2">;
 	ulong		next_data				<comment="next data block ptr (0 for last)">;
-	ulong		chksum					<comment="rootblock algorithm">;
+	ulong		chksum					<format=hex,comment="rootblock algorithm">;
 	uchar		data[488]				<comment="file data size <= (BSIZE-24)">;
 } DATABLOCK <comment="Data block (OFS)">; 
 
@@ -88,7 +154,7 @@ BigEndian();
 HighlightAllowInstanceSharing( true );
 
 // Define the locals
-local uchar sector[BSIZE];
+local uchar blockArray[BSIZE];
 local uchar bootblock[BSIZE * 2];
 local int64 pos = 0;
 
@@ -104,22 +170,40 @@ void _sequentialAproach() {
 	while( !FEof() )
 	{
 	
-		ReadBytes( sector, pos, BSIZE );
+		ReadBytes( blockArray, pos, BSIZE );
 	
 		//detect boot block
-		if ( sector[0] == 'D' && sector[1] == 'O' && sector[2] == 'S' ) {
+		if ( blockArray[0] == 'D' && blockArray[1] == 'O' && blockArray[2] == 'S' ) {
 			ReadBytes( bootblock, pos, BSIZE * 2 );
 			BOOTBLOCK typebootblock;
 		}
 	
-		if ( sector[3] == 8 )
+		//detect OFS data block
+		if ( blockArray[3] == 8 )
 		{
 			DATABLOCK typedatablock;
 		}
-	
+		
+		//detect file header blocks
+		
+		
 		//set file cursor to next block
 		pos += BSIZE;
-		FSeek(pos);
+		FSeek( pos );
+	}
+}
+
+// Loop through disc sectors sequentially
+void _sequentialAproach2() {
+	local int blockNumber = 0;
+
+	while( !FEof() )
+	{
+		_getBlockType2(  blockNumber );
+		
+		//set file cursor to next block
+		blockNumber++;
+		if( blockNumber == 1760 ) { break; }
 	}
 }
 
@@ -134,14 +218,16 @@ void _filesystemTreeAproach() {
 	if ( typebootblock.Rootblock > 0 && typebootblock.Rootblock < 1760 ) { //1760 is maximum size of DD discs. HD is twice as much.
 		rootPointer = typebootblock.Rootblock;
 	}
-	ReadBytes( sector, rootPointer, BSIZE );
+	
+	FSeek( rootPointer * BSIZE );
+	ReadBytes( blockArray, rootPointer * BSIZE, BSIZE );
 	ROOTBLOCK typerootblock;
 	if ( typerootblock.type != 2 || typerootblock.sec_type != 1 ) {
-		typerootblock = 0;
+		//typerootblock = 0;
 	}
 
 
-	Printf( "Boot block root pointer 1: %d\n", _getULongByPos_BigEndian( 8 ) );
+	Printf( "Boot block root pointer 1: %d\n", ReadInt( 8 ) );
 	Printf( "Boot block root pointer 2: %d\n", typebootblock.Rootblock );
 }
 
@@ -150,10 +236,104 @@ void _filesystemTreeAproach() {
 /*
  * helpers
  */
-// get ulong values
-ulong _getULongByPos_BigEndian( int pos ) {
-	ReadBytes( ulongValue, pos, 4 );
-	return (ulongValue[0] * Pow( 2, 32 )) + (ulongValue[1] * Pow( 2, 16 )) + (ulongValue[2] * Pow( 2, 8 )) + (ulongValue[3]);
+// get disc type flags string
+string _getDiscFlagsString( byte flags ) {
+	string strFlags = "";
+
+	if( ((flags) & (1<<(0))) ) {
+		strFlags += "| FFS ";
+	} else {
+		strFlags += "| OFS ";
+	}
+
+	if( ((flags) & (1<<(1))) ) {
+		strFlags += "| INTL ONLY ";
+	} else {
+		strFlags += "| NO_INTL ONLY ";
+	}
+
+	if( ((flags) & (1<<(2))) ) {
+		strFlags += "| DIRC&INTL ";
+	} else {
+		strFlags += "| NO_DIRC&INTL ";
+	}
+
+	return strFlags;
+}
+
+// get block type
+BLOCKTYPE _getBlockType( int blockNumber ){
+	//prepare var
+	local BLOCKTYPE bt = UNKNOWN;
+
+	//detect boot block
+	ReadBytes( blockArray, blockNumber * BSIZE, BSIZE );
+	if ( blockArray[0] == 'D' && blockArray[1] == 'O' && blockArray[2] == 'S' ) {
+		return bt = BootBlock;
+	}
+
+	//get type ulongs of block
+	local int type = ReadInt( blockNumber * BSIZE );
+	local int sec_type = ReadInt( (blockNumber * BSIZE) + 508 );
+	//Printf( "	type: %d - sec-type: %d\n", type, sec_type );
+	
+	//detect different block types
+	if ( type == 2 && sec_type == 1 ) { return bt = RootBlock; }			//detect root block
+	if ( type == 2 && sec_type == -3 ) { return bt = FileHeaderBlock; }		//detect file header
+	if ( type == 16 && sec_type == -3 ) { return bt = FileExtensionBlock; }	//detect file extension block
+	if ( type == 8 ) { return bt = DataBlock; }								//detect data block
+	if ( type == 2 && sec_type == 2 ) { return bt = UserDirectoryBlock; }	//detect user directory block
+
+	return bt;
+}
+
+// get block type
+BLOCKTYPE _getBlockType2( int blockNumber ){
+	//prepare var
+	local BLOCKTYPE bt = UNKNOWN;
+
+	//detect boot block
+	//Printf( "	blockNumber in _getBlockType2: %d\n", blockNumber );
+	FSeek( blockNumber * BSIZE );
+	ReadBytes( blockArray, blockNumber * BSIZE, BSIZE );
+
+	if ( blockArray[0] == 'D' && blockArray[1] == 'O' && blockArray[2] == 'S' &&
+		 blockArray[4] != 'D' && blockArray[5] != 'O' && blockArray[6] != 'S' ) {	//detect root block
+		BOOTBLOCK typebootblock;
+		return bt = BootBlock;
+	}
+
+	//get type ulongs of block
+	local int type = ReadInt( blockNumber * BSIZE );
+	local int sec_type = ReadInt( (blockNumber * BSIZE) + 508 );
+	//Printf( "	type: %d - sec-type: %d\n", type, sec_type );
+	
+	//detect different block types
+	if ( type == 2 && sec_type == 1 ) {			//detect root block
+		ROOTBLOCK typerootblock;
+		return bt = RootBlock;
+	}
+
+	if ( type == 2 && sec_type == -3 ) {		//detect file header
+		FILEHEADERBLOCK typefileheaderblock; 
+		return bt = FileHeaderBlock;
+	}
+
+	if ( type == 16 && sec_type == -3 ) {		//detect file extension block
+		FILEEXTENSIONBLOCK typefileextensionblock;
+		return bt = FileExtensionBlock;
+	}
+
+	if ( type == 8 ) {							//detect data block
+		DATABLOCK typedatablock;
+		return bt = DataBlock;
+	}
+
+	if ( type == 2 && sec_type == 2 ) {			//detect user directory block
+		return bt = UserDirectoryBlock;
+	}
+
+	return bt;
 }
 
 
@@ -163,7 +343,26 @@ ulong _getULongByPos_BigEndian( int pos ) {
  */
 Printf( "Start template\n" );
 
-//_sequentialAproach();
-_filesystemTreeAproach();
+Printf( "ulong value of block 880 byte 0-3: %d\n\n", ReadInt( 880*BSIZE ) );
 
-Printf( "Template done\n" );
+local int blockNr = 0;
+local BLOCKTYPE bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 880; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 3; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 952; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+blockNr = 893; bt2 = _getBlockType( blockNr );
+Printf( "Block type %d	: %d (%s)\n\n", blockNr, bt2, EnumToString( bt2 ) );
+
+//_sequentialAproach();
+_sequentialAproach2();
+//_filesystemTreeAproach();
+
+Printf( "Template done\n\n\n" );
