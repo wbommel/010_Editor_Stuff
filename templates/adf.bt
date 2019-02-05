@@ -13,8 +13,10 @@
 
 
 // Define constants
-const int BSIZE		= 512;				// sizeof a disc sector in bytes
+const int BSIZE		= 512;				// sizeof a disk sector in bytes
 const int HT_SIZE	= BSIZE / 4 - 56;	//
+
+
 
 //define enums
 enum BLOCKTYPE {
@@ -29,10 +31,11 @@ enum BLOCKTYPE {
 };
 
 
+
 // Boot block structure
 typedef struct {
 	uchar		DiskType[3]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
-	uchar		flags					<format=binary,comment=_getDiscFlagsString>;
+	uchar		flags					<format=binary,comment=_getDiskFlagsString>;
 	ulong		chksum					<format=hex,comment="special block checksum",fgcolor=cAqua,bgcolor=cWhite>;
 	ulong		Rootblock				<comment="Value is 880 for DD and HD",fgcolor=cLtYellow,bgcolor=cBlack>;
 	uchar		Bootblock_code[1012]	<comment="BOOT_CODE",fgcolor=cWhite,bgcolor=cBlack>;
@@ -74,7 +77,13 @@ typedef struct {
 typedef struct {
 	ulong		chksum					<format=hex,comment="normal algorithm">;
 	ulong		map[(BSIZE/4) - 1]		<comment="map">;
-} BITMAPBLOCK <bgcolor=cGray,comment="Root block">;
+} BITMAPBLOCK <bgcolor=cGray,comment="Bitmap block">;
+
+// Bitmap extension block (hard disk only)
+typedef struct {
+	ulong		map[(BSIZE/4) - 1]		<comment="bitmap block pointers">;
+	ulong		next					<comment="next bitmap extension block (0 for last)">;
+} BITMAPEXTENSIONBLOCK <bgcolor=cGray,comment="Bitmap extension block">;
 
 // File header block structure
 typedef struct {
@@ -165,7 +174,7 @@ local uchar ulongValue[4];
 /*
  * function declarations
  */
-// Loop through disc sectors sequentially
+// Loop through disk sectors sequentially
 void _sequentialAproach() {
 	while( !FEof() )
 	{
@@ -193,7 +202,7 @@ void _sequentialAproach() {
 	}
 }
 
-// Loop through disc sectors sequentially
+// Loop through disk sectors sequentially
 void _sequentialAproach2() {
 	local int blockNumber = 0;
 
@@ -215,7 +224,7 @@ void _filesystemTreeAproach() {
 
 	//read root block
 	local int rootPointer = 880; //standard value for root block is 880
-	if ( typebootblock.Rootblock > 0 && typebootblock.Rootblock < 1760 ) { //1760 is maximum size of DD discs. HD is twice as much.
+	if ( typebootblock.Rootblock > 0 && typebootblock.Rootblock < 1760 ) { //1760 is maximum size of DD disks. HD is twice as much.
 		rootPointer = typebootblock.Rootblock;
 	}
 	
@@ -236,8 +245,8 @@ void _filesystemTreeAproach() {
 /*
  * helpers
  */
-// get disc type flags string
-string _getDiscFlagsString( byte flags ) {
+// get disk type flags string
+string _getDiskFlagsString( byte flags ) {
 	string strFlags = "";
 
 	if( ((flags) & (1<<(0))) ) {
