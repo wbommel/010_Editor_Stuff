@@ -4,11 +4,11 @@
 //         File: adf.bt
 //      Authors: Volker Broemmel
 //      Version: 0.1.0
-//      Purpose: 
-//     Category: 
+//      Purpose: detect block types of AmigaDOS disk images.
+//     Category: Drives
 //    File Mask: *.adf
-//     ID Bytes: 
-//      History: 
+//     ID Bytes: -
+//      History: 0.1.0 2019-02-06: initial release
 //
 //Documentation:
 //	The knowledge that has flowed in here came mainly
@@ -79,6 +79,9 @@ enum BLOCKINFO {
 local BLOCKINFO _blockInfo[BCOUNT];
 _initBlockInfo();
 
+// Define globals
+local int isFFS = 0;		// determines if this is an OFS or FFS
+_getFileSystemType();
 
 
 /*
@@ -101,7 +104,7 @@ typedef struct {
 	ulong		ht_size					<comment="Hash table size in long (= BSIZE/4 - 56). For floppy disk value 0x48">;
 	ulong		first_data				<comment="unused (value 0)">;
 	ulong		chksum					<format=hex,comment="Rootblock checksum">;
-	ulong		ht[(BSIZE/4) - 56]		<comment="hash table (entry block number) (= (BSIZE/4) - 56) for floppy disk: size= 72 longwords">;
+	ulong		ht[(BSIZE/4)-56]		<comment="hash table (entry block number) (= (BSIZE/4) - 56) for floppy disk: size= 72 longwords">;
 	ulong		bm_flag					<comment="bitmap flag, -1 means VALID">;
 	ulong		bm_pages[25]			<comment="bitmap blocks pointers (first one at bm_pages[0])">;
 	ulong		bm_ext					<comment="first bitmap extension block (Hard disks only)">;
@@ -145,7 +148,7 @@ typedef struct {
 	ulong		data_size				<comment="unused (==0)">;
 	ulong		first_data				<comment="first data block ptr">;
 	ulong		chksum					<format=hex,comment="same algorithm as rootblock">;
-	ulong		data_blocks[(BSIZE/4) - 56]	<comment="data blk ptr (first at BSIZE-204) = (BSIZE/4) - 56">;
+	ulong		data_blocks[(BSIZE/4)-56]	<comment="data blk ptr (first at BSIZE-204) = (BSIZE/4) - 56">;
 	ulong		UNUSED0					<comment="unused (==0)">;
 	ushort		UID						<comment="UserID">;
 	ushort		GID						<comment="GroupID">;
@@ -178,7 +181,7 @@ typedef struct {
 	ulong		UNUSED0					<comment="unused (==0)">;
 	ulong		UNUSED1					<comment="unused (==0)">;
 	ulong		chksum					<format=hex,comment="rootblock algorithm">;
-	ulong		data_blocks[(BSIZE/4) - 56]	<comment="data blk ptr (first at BSIZE-204) = (BSIZE/4) - 56">;
+	ulong		data_blocks[(BSIZE/4)-56]	<comment="data blk ptr (first at BSIZE-204) = (BSIZE/4) - 56">;
 	ulong		info[46]				<comment="unused (==0)">;
 	ulong		UNUSED2					<comment="unused (==0)">;
 	ulong		parent					<comment="file header block">;
@@ -194,8 +197,13 @@ typedef struct {
 	ulong		data_size				<comment="data size <= (BSIZE-2">;
 	ulong		next_data				<comment="next data block ptr (0 for last)">;
 	ulong		chksum					<format=hex,comment="rootblock algorithm">;
-	uchar		data[488]				<comment="file data size <= (BSIZE-24)">;
-} DATABLOCK <comment="Data block (OFS)">; 
+	uchar		data[BSIZE-24]			<comment="file data, size <= (BSIZE-24)">;
+} DATABLOCKOFS <comment="Data block (OFS)">; 
+
+// FFS data block structure
+typedef struct {
+	uchar		data[BSIZE]				<comment="file data, full block">;
+} DATABLOCKFFS <comment="Data block (FFS)">; 
 
 // User directory block structure
 typedef struct {
@@ -203,7 +211,7 @@ typedef struct {
 	ulong		header_key				<comment="self pointer">;
 	ulong		UNUSED0[3]				<comment="unused (==0)">;
 	ulong		chksum					<format=hex,comment="normal checksum algorithm">;
-	ulong		ht[(BSIZE/4) - 56]		<comment="hash table (entry block number) (= (BSIZE/4) - 56) for floppy disk: size= 72 longwords">;
+	ulong		ht[(BSIZE/4)-56]		<comment="hash table (entry block number) (= (BSIZE/4) - 56) for floppy disk: size= 72 longwords">;
 	ulong		UNUSED1[2]				<comment="unused (==0)">;
 	ushort		UID						<comment="User ID">;
 	ulong		GID						<comment="Group ID">;
@@ -235,10 +243,35 @@ typedef struct {
 // initialize block info array
 void _initBlockInfo(){
 	local int i;
-	Printf( "Initialize Blockinfo\n" );
+
 	for( i = 0; i < BCOUNT; i++ ){
 		_blockInfo[i] = TBA;
 	}
+	
+	_printBlockInfoArray();
+}
+
+// print block info
+void _printBlockInfoArray(){
+	local int i, j;
+	for ( j = 0; j < BCOUNT / 16; j++ ){
+		for ( i = 0; i < 16; i++ ){
+			Printf("%02x ",_blockInfo[j*i]);
+		}
+		Printf("\n");
+	}
+	Printf("\n\n");
+}
+
+// get file system type
+void _getFileSystemType(){
+	local uchar firstBytes[4];
+
+	FSeek(0);
+	ReadBytes( firstBytes, 0, 4 );
+
+	if( ((firstBytes[3]) & (1<<(0))) ) { isFFS = 1; }
+	Printf( "isFFS: %d\n", isFFS );
 }
 
 // get disk type flags string
@@ -287,9 +320,12 @@ void _sequentialAproach() {
 
 // get block type
 void _detectBlockType( int blockNumber ){
+	//test
+	//if(blockNumber==54){Printf("Block 54...\n");}
+
 	//check if block was already analyzed
 	if( _blockInfo[blockNumber] == KnownBlockType ) {
-		Printf( "Blocktype of block %d already detected\n", blockNumber );
+		//Printf( "Blocktype of block %d already detected\n", blockNumber );
 		return; 
 	}
 
@@ -318,23 +354,23 @@ void _detectBlockType( int blockNumber ){
 		_blockInfo[blockNumber] = KnownBlockType;
 
 		//follow bitmap blocks
-		FSeek( typerootblock.bm_pages[0] * BSIZE );
-		ReadBytes( blockArray, typerootblock.bm_pages[0] * BSIZE, BSIZE );
-		BITMAPBLOCK typebitmapblock;
+		_followBitmapBlocks( typerootblock.bm_pages );
 	}
 
 	if ( type == 2 && sec_type == -3 ) {		//detect file header
 		FILEHEADERBLOCK typefileheaderblock;
 		_blockInfo[blockNumber] = KnownBlockType;
+		if( isFFS == 1 ) { _followDataBlocks( typefileheaderblock.data_blocks ); }
 	}
 
 	if ( type == 16 && sec_type == -3 ) {		//detect file extension block
 		FILEEXTENSIONBLOCK typefileextensionblock;
 		_blockInfo[blockNumber] = KnownBlockType;
+		if( isFFS == 1 ) { _followDataBlocks( typefileheaderblock.data_blocks ); }
 	}
 
-	if ( type == 8 ) {							//detect data block
-		DATABLOCK typedatablock;
+	if ( isFFS == 0 && type == 8 ) {			//detect data block
+		DATABLOCKOFS typedatablock;
 		_blockInfo[blockNumber] = KnownBlockType;
 	}
 
@@ -344,14 +380,16 @@ void _detectBlockType( int blockNumber ){
 	}
 
 	// no known block type
-	_blockInfo[blockNumber] = UnknownBlockType;
+	//if ( _blockInfo[blockNumber] != KnownBlockType ) { _blockInfo[blockNumber] = UnknownBlockType; }
 }
 
 // follow block chains
 void _followBitmapBlocks( ulong bm_pages[] ){
+	//prepare vars
+	local uchar blockArray[BSIZE];
 	local int i;
 
-	for ( i = 0; i < sizeof(i); i++ ){
+	for ( i = 0; i < sizeof(bm_pages)/4; i++ ){
 		// skip iteration or even break out of the loop
 		if ( bm_pages[i] == 0 || bm_pages[i] > BCOUNT -1 ) { continue; } 
 
@@ -362,6 +400,23 @@ void _followBitmapBlocks( ulong bm_pages[] ){
 	}
 	
 	// TODO: here should follow a possible bitmap extension block(s) analysis for hard disk files
+}
+
+void _followDataBlocks( ulong data_blocks[] ){
+	//prepare vars
+	local uchar blockArray[BSIZE];
+	local int i;
+
+	for ( i = 0; i < sizeof(data_blocks)/4; i++ ){
+		// skip iteration or even break out of the loop
+		if ( data_blocks[i] == 0 || data_blocks[i] > BCOUNT -1 ) { continue; } 
+
+		// mark bitmap block
+		FSeek( data_blocks[i] * BSIZE );
+		ReadBytes( blockArray, data_blocks[i] * BSIZE, BSIZE );
+		DATABLOCKFFS typedatablockffs;
+		_blockInfo[data_blocks[i]] = KnownBlockType;
+	}
 }
 
 
@@ -375,4 +430,5 @@ Printf( "Block Count: %d\n\n", BCOUNT );
 
 _sequentialAproach();
 
+_printBlockInfoArray();
 Printf( "\nTemplate done\n\n\n" );
