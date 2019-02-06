@@ -3,48 +3,87 @@
 //
 //         File: adf.bt
 //      Authors: Volker Broemmel
-//      Version: 0.0.1
+//      Version: 0.1.0
 //      Purpose: 
 //     Category: 
 //    File Mask: *.adf
 //     ID Bytes: 
 //      History: 
+//
 //Documentation:
+//	The knowledge that has flowed in here came mainly
+//	from the outstanding "The .ADF (Amiga Disk File) format FAQ"
+//	of Laurent Clévy (http://lclevy.free.fr/adflib/adf_info.html).
 //
-//Protection bit flags (File Header Block / User Directory Block):
-//	Bit		If set, means
-//	If MultiUser FileSystem : Owner
-//	0		delete forbidden (D)
-//	1		not executable (E)
-//	2		not writable (W)
-//	3		not readable (R)
+//	DiskType of boot block (first int32 of disk):
+//		'D''O''S' + flags
+//		flags = 3 least signifiant bits
+//			set			clr
+//		0	FFS			OFS
+//		1	INTL ONLY	NO_INTL ONLY
+//		2	DIRC&INTL	NO_DIRC&INTL
 //
-//	4		is archived (A)
-//	5		pure (reetrant safe), can be made resident (P)
-//	6		file is a script (Arexx or Shell) (S)
-//	7		Hold bit. if H+P (and R+E) are set the file can be made resident on first load (OS 2.x and 3.0)
+//	Protection bit flags (File Header Block / User Directory Block):
+//		Bit		If set, means
+//		If MultiUser FileSystem : Owner
+//		0		delete forbidden (D)
+//		1		not executable (E)
+//		2		not writable (W)
+//		3		not readable (R)
 //
-//	8		Group (D) : is delete protected 
-//	9		Group (E) : is executable 
-//	10		Group (W) : is writable 
-//	11		Group (R) : is readable 
+//		4		is archived (A)
+//		5		pure (reetrant safe), can be made resident (P)
+//		6		file is a script (Arexx or Shell) (S)
+//		7		Hold bit. if H+P (and R+E) are set the file can be made resident on first load (OS 2.x and 3.0)
 //
-//	12		Other (D) : is delete protected 
-//	13		Other (E) : is executable 
-//	14		Other (W) : is writable 
-//	15		Other (R) : is readable 
+//		8		Group (D) : is delete protected 
+//		9		Group (E) : is executable 
+//		10		Group (W) : is writable 
+//		11		Group (R) : is readable 
 //
-//	30-16	reserved
-//	31		SUID, MultiUserFS Only
-
+//		12		Other (D) : is delete protected 
+//		13		Other (E) : is executable 
+//		14		Other (W) : is writable 
+//		15		Other (R) : is readable 
+//
+//		30-16	reserved
+//		31		SUID, MultiUserFS Only
 //------------------------------------------------
+
+
+
+/*
+ * Prerequisites
+ */
+// Values in 68xxx CPU's are BigEndian
+BigEndian();
+
+// To save memory, allow a single copy of this template to provide 
+//  syntax highlighting for all open files that match the file mask.
+HighlightAllowInstanceSharing( true );
+
 
 
 // Define constants
 const int BSIZE		= 512;				// sizeof a disk sector in bytes
+const int64 FSIZE	= FileSize();
+const int BCOUNT	= FSIZE/BSIZE;
+
+
+// Define enums
+enum BLOCKINFO {
+	TBA					= 0,	// To be analyzed
+	KnownBlockType		= 1,
+	UnknownBlockType	= 2
+};
+local BLOCKINFO _blockInfo[BCOUNT];
+_initBlockInfo();
 
 
 
+/*
+ *	Block structure definitions
+ */
 // Boot block structure
 typedef struct {
 	uchar		DiskType[3]				<comment="'D''O''S' + flags",fgcolor=cPurple,bgcolor=cRed>;
@@ -190,19 +229,18 @@ typedef struct {
 
 
 
-//--------------------------------------------
-// Values in 68xxx CPU's are BigEndian
-BigEndian();
-
-// To save memory, allow a single copy of this template to provide 
-//  syntax highlighting for all open files that match the file mask.
-HighlightAllowInstanceSharing( true );
-
-
-
 /*
  * helper functions
  */
+// initialize block info array
+void _initBlockInfo(){
+	local int i;
+	Printf( "Initialize Blockinfo\n" );
+	for( i = 0; i < BCOUNT; i++ ){
+		_blockInfo[i] = TBA;
+	}
+}
+
 // get disk type flags string
 string _getDiskFlagsString( byte flags ) {
 	string strFlags = "";
@@ -241,14 +279,20 @@ void _sequentialAproach() {
 	{
 		_detectBlockType( blockNumber );
 		
-		//set file cursor to next block
+		//go to next block
 		blockNumber++;
-		if( blockNumber == 1760 ) { break; }
+		if( blockNumber == BCOUNT ) { break; }
 	}
 }
 
 // get block type
 void _detectBlockType( int blockNumber ){
+	//check if block was already analyzed
+	if( _blockInfo[blockNumber] == KnownBlockType ) {
+		Printf( "Blocktype of block %d already detected\n", blockNumber );
+		return; 
+	}
+
 	//prepare vars
 	local uchar blockArray[BSIZE];
 
@@ -260,6 +304,8 @@ void _detectBlockType( int blockNumber ){
 	if ( blockArray[0] == 'D' && blockArray[1] == 'O' && blockArray[2] == 'S' &&
 		 blockArray[4] != 'D' && blockArray[5] != 'O' && blockArray[6] != 'S' ) {	//detect root block
 		BOOTBLOCK typebootblock;
+		_blockInfo[0] = KnownBlockType;
+		_blockInfo[1] = KnownBlockType; // boot block consists of 2 blocks on floppy disks (not on hard disks, though)
 	}
 
 	//get type ulongs of block
@@ -269,28 +315,53 @@ void _detectBlockType( int blockNumber ){
 	//detect different block types
 	if ( type == 2 && sec_type == 1 ) {			//detect root block
 		ROOTBLOCK typerootblock;
+		_blockInfo[blockNumber] = KnownBlockType;
 
-		//detect Bitmap Block
+		//follow bitmap blocks
 		FSeek( typerootblock.bm_pages[0] * BSIZE );
 		ReadBytes( blockArray, typerootblock.bm_pages[0] * BSIZE, BSIZE );
 		BITMAPBLOCK typebitmapblock;
 	}
 
 	if ( type == 2 && sec_type == -3 ) {		//detect file header
-		FILEHEADERBLOCK typefileheaderblock; 
+		FILEHEADERBLOCK typefileheaderblock;
+		_blockInfo[blockNumber] = KnownBlockType;
 	}
 
 	if ( type == 16 && sec_type == -3 ) {		//detect file extension block
 		FILEEXTENSIONBLOCK typefileextensionblock;
+		_blockInfo[blockNumber] = KnownBlockType;
 	}
 
 	if ( type == 8 ) {							//detect data block
 		DATABLOCK typedatablock;
+		_blockInfo[blockNumber] = KnownBlockType;
 	}
 
 	if ( type == 2 && sec_type == 2 ) {			//detect user directory block
 		USERDIRECTORYBLOCK typeuserdirectoryblock;
+		_blockInfo[blockNumber] = KnownBlockType;
 	}
+
+	// no known block type
+	_blockInfo[blockNumber] = UnknownBlockType;
+}
+
+// follow block chains
+void _followBitmapBlocks( ulong bm_pages[] ){
+	local int i;
+
+	for ( i = 0; i < sizeof(i); i++ ){
+		// skip iteration or even break out of the loop
+		if ( bm_pages[i] == 0 || bm_pages[i] > BCOUNT -1 ) { continue; } 
+
+		// mark bitmap block
+		FSeek( bm_pages[i] * BSIZE );
+		ReadBytes( blockArray, bm_pages[i] * BSIZE, BSIZE );
+		BITMAPBLOCK typebitmapblock;
+	}
+	
+	// TODO: here should follow a possible bitmap extension block(s) analysis for hard disk files
 }
 
 
@@ -298,8 +369,10 @@ void _detectBlockType( int blockNumber ){
 /*
  * template action
  */
-Printf( "Start template\n" );
+Printf( "Start template\n\n" );
+Printf( "Filesize   : %d\n", FSIZE );
+Printf( "Block Count: %d\n\n", BCOUNT );
 
 _sequentialAproach();
 
-Printf( "Template done\n\n\n" );
+Printf( "\nTemplate done\n\n\n" );
