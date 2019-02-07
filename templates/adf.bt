@@ -2,13 +2,16 @@
 //--- 010 Editor v9.0.1 Binary Template
 //
 //         File: adf.bt
-//      Authors: Volker Broemmel
-//      Version: 0.1.0
+//      Authors: Volker Broemmel (VB)
+//      Version: 0.9
 //      Purpose: detect block types of AmigaDOS disk images.
 //     Category: Drives
 //    File Mask: *.adf
-//     ID Bytes: -
-//      History: 0.1.0 2019-02-06: initial release
+//     ID Bytes:
+//      History:
+//   0.9 2019-02-07 VB: initial release
+//
+//      Remarks: use template at your own risk. Please make backups of your files first.
 //
 //Documentation:
 //	The knowledge that has flowed in here came mainly
@@ -22,6 +25,7 @@
 //		0	FFS			OFS
 //		1	INTL ONLY	NO_INTL ONLY
 //		2	DIRC&INTL	NO_DIRC&INTL
+//	find further information in Laurent's FAQ.
 //
 //	Protection bit flags (File Header Block / User Directory Block):
 //		Bit		If set, means
@@ -48,6 +52,28 @@
 //
 //		30-16	reserved
 //		31		SUID, MultiUserFS Only
+//
+// Program flow:
+//	First of the important info about the image file is gathered like 
+//	block count and if it's a FFS or an OFS file system. Also the global
+//	block info array is initialized which has the size of block count
+//	and holds information on each block if it is a known block type or not.
+//		Then the image file is analyzed block by block almost sequentially
+//	block by block. There are a few exceptions, though. Block-Types like
+//	Bitmap-Block or FFS-Data-Block are hard or even impossible to tetect
+//	by themselves. Thus certain collections are followed right away,
+//	"breaking" the sequence:
+//		* bm_pages collection in Root-Block
+//		* data_blocks collection in File-Header-Block (FFS only)
+//		* data_blocks collection in File-Extension-Block (FFS only)
+//	Analyzing such a block again is avoided by marking it as KnownBlockType.
+//	The sequence-loop skips those blocks.
+//
+//  Known issus:
+//	*	Link-Blocks are not supported
+//	*	Directory cache blocks (FFS) are not supported
+//	This version is neither tested on HD disk images nor on hard disk
+//	images.
 //------------------------------------------------
 
 
@@ -65,14 +91,14 @@ HighlightAllowInstanceSharing( true );
 
 
 // Define constants
-const int BSIZE		= 512;				// sizeof a disk sector in bytes
+const int BSIZE		= 512;			// sizeof a disk sector in bytes
 const int64 FSIZE	= FileSize();
 const int BCOUNT	= FSIZE/BSIZE;
 
 
 // Define enums
 enum BLOCKINFO {
-	TBA					= 0,	// To be analyzed
+	TBA					= 0,		// To be analyzed
 	KnownBlockType		= 1,
 	UnknownBlockType	= 2
 };
@@ -80,7 +106,7 @@ local BLOCKINFO _blockInfo[BCOUNT];
 _initBlockInfo();
 
 // Define globals
-local int isFFS = 0;		// determines if this is an OFS or FFS
+local int isFFS = 0;				// determines if this is an OFS or FFS disk
 _getFileSystemType();
 
 
@@ -197,12 +223,12 @@ typedef struct {
 	ulong		data_size				<comment="data size <= (BSIZE-2">;
 	ulong		next_data				<comment="next data block ptr (0 for last)">;
 	ulong		chksum					<format=hex,comment="rootblock algorithm">;
-	uchar		data[BSIZE-24]			<comment="file data, size <= (BSIZE-24)">;
+	uchar		data[BSIZE-24]			<format=hex,comment="file data, size <= (BSIZE-24)">;
 } DATABLOCKOFS <comment="Data block (OFS)">; 
 
 // FFS data block structure
 typedef struct {
-	uchar		data[BSIZE]				<comment="file data, full block">;
+	uchar		data[BSIZE]				<format=hex,comment="file data, full block">;
 } DATABLOCKFFS <comment="Data block (FFS)">; 
 
 // User directory block structure
@@ -247,18 +273,17 @@ void _initBlockInfo(){
 	for( i = 0; i < BCOUNT; i++ ){
 		_blockInfo[i] = TBA;
 	}
-	
-	_printBlockInfoArray();
+	//_printBlockInfoArray();
 }
 
-// print block info
+// print block info for debugging purposes
 void _printBlockInfoArray(){
 	local int i, j;
-	for ( j = 0; j < BCOUNT / 16; j++ ){
-		for ( i = 0; i < 16; i++ ){
-			Printf("%02x ",_blockInfo[j*i]);
-		}
-		Printf("\n");
+
+	for ( i = 0; i < BCOUNT; i++ )
+	{	
+		if(i%16==0){Printf("\n");}
+		Printf("%02x ",_blockInfo[i]);
 	}
 	Printf("\n\n");
 }
@@ -271,10 +296,9 @@ void _getFileSystemType(){
 	ReadBytes( firstBytes, 0, 4 );
 
 	if( ((firstBytes[3]) & (1<<(0))) ) { isFFS = 1; }
-	Printf( "isFFS: %d\n", isFFS );
 }
 
-// get disk type flags string
+// get disk type flags string for comments
 string _getDiskFlagsString( byte flags ) {
 	string strFlags = "";
 
@@ -308,24 +332,16 @@ string _getDiskFlagsString( byte flags ) {
 void _sequentialAproach() {
 	local int blockNumber = 0;
 
-	while( !FEof() )
+	for ( blockNumber = 0; blockNumber < BCOUNT; blockNumber++ )
 	{
 		_detectBlockType( blockNumber );
-		
-		//go to next block
-		blockNumber++;
-		if( blockNumber == BCOUNT ) { break; }
 	}
 }
 
 // get block type
 void _detectBlockType( int blockNumber ){
-	//test
-	//if(blockNumber==54){Printf("Block 54...\n");}
-
-	//check if block was already analyzed
+	//check if block was already detected
 	if( _blockInfo[blockNumber] == KnownBlockType ) {
-		//Printf( "Blocktype of block %d already detected\n", blockNumber );
 		return; 
 	}
 
@@ -347,7 +363,7 @@ void _detectBlockType( int blockNumber ){
 	//get type ulongs of block
 	local int type = ReadInt( blockNumber * BSIZE );
 	local int sec_type = ReadInt( (blockNumber * BSIZE) + 508 );
-	
+
 	//detect different block types
 	if ( type == 2 && sec_type == 1 ) {			//detect root block
 		ROOTBLOCK typerootblock;
@@ -380,7 +396,7 @@ void _detectBlockType( int blockNumber ){
 	}
 
 	// no known block type
-	//if ( _blockInfo[blockNumber] != KnownBlockType ) { _blockInfo[blockNumber] = UnknownBlockType; }
+	if ( _blockInfo[blockNumber] != KnownBlockType ) { _blockInfo[blockNumber] = UnknownBlockType; }
 }
 
 // follow block chains
@@ -424,11 +440,13 @@ void _followDataBlocks( ulong data_blocks[] ){
 /*
  * template action
  */
-Printf( "Start template\n\n" );
-Printf( "Filesize   : %d\n", FSIZE );
-Printf( "Block Count: %d\n\n", BCOUNT );
+Printf( "Filesize   : %d (%s)\n", FSIZE, FSIZE == 901120 ? "DD" : "HD" );
+Printf( "Block Count: %d\n", BCOUNT );
+Printf( "isFFS      : %d\n\n", isFFS );
+
+Printf( "Start template\n" );
 
 _sequentialAproach();
 
-_printBlockInfoArray();
-Printf( "\nTemplate done\n\n\n" );
+//_printBlockInfoArray();
+Printf( "Template done\n\n" );
