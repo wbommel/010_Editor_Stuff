@@ -1,10 +1,10 @@
 //------------------------------------------------
 //--- 010 Editor v9.0.1 Binary Template
 //
-//         File: adf.bt
+//         File: ADF.bt
 //      Authors: Volker Broemmel (VB)
 //      Version: 0.9
-//      Purpose: detect block types of AmigaDOS disk images.
+//      Purpose: Detect block types of AmigaDOS disk images.
 //     Category: Drives
 //    File Mask: *.adf
 //     ID Bytes:
@@ -83,12 +83,6 @@
  */
 // Values in 68xxx CPU's are BigEndian
 BigEndian();
-
-// To save memory, allow a single copy of this template to provide 
-//  syntax highlighting for all open files that match the file mask.
-HighlightAllowInstanceSharing( true );
-
-
 
 // Define constants
 const int BSIZE		= 512;			// sizeof a disk sector in bytes
