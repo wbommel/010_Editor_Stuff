@@ -56,12 +56,12 @@
 //		31		SUID, MultiUserFS Only
 //
 // Program flow:
-//	First of the important info about the image file is gathered like 
+//	First off, the important info about the image file is gathered like 
 //	block count and if it's a FFS or an OFS file system. Also the global
 //	block info array is initialized which has the size of block count
 //	and holds information on each block if it is a known block type or not.
-//		Then the image file is analyzed block by block almost sequentially
-//	block by block. There are a few exceptions, though. Block-Types like
+//		Then the image file is analyzed almost sequentially	block by block. 
+//  There are a few exceptions, though. Block-Types like
 //	Bitmap-Block or FFS-Data-Block are hard or even impossible to tetect
 //	by themselves. Thus certain collections are followed right away,
 //	"breaking" the sequence:
@@ -74,8 +74,7 @@
 //  Known issus:
 //	*	Link-Blocks are not supported
 //	*	Directory cache blocks (FFS) are not supported
-//	This version is neither tested on HD disk images nor on hard disk
-//	images.
+//	This version is not tested on hard disk images.
 //------------------------------------------------
 
 
